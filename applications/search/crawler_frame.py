@@ -58,6 +58,29 @@ def extract_next_links(rawDataObj):
 
     Suggested library: lxml
     '''
+    # print("URL")
+    # print(rawDataObj.url)
+    print("CONTENT HII")
+    text = rawDataObj.content
+    print(type(text))
+    # print("ERROR MESSAGE")
+    # print(rawDataObj.error_message)
+    # print("HEADERS")
+    # print(rawDataObj.headers)
+    # print("HTTP CODE")
+    # print(rawDataObj.http_code)
+    # print("IS REDIRECTED")
+    # print(rawDataObj.is_redirected)
+    # print("FINAL URL")
+    # print(rawDataObj.final_url)
+
+    f1 = open("SiteContent.txt", "w")
+    f1.write(str(text))
+    f1.close()
+
+
+
+
     return outputLinks
 
 def is_valid(url):
