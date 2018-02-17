@@ -27,6 +27,7 @@ class CrawlerFrame(IApplication):
     def initialize(self):
         self.count = 0
         l = FkfungNssabaLink("http://www.ics.uci.edu/")
+        #l = FkfungNssabaLink("http://www.ics.uci.edu/ugrad/polices/academic_standing")
         print l.full_url
         self.frame.add(l)
 
@@ -60,25 +61,50 @@ def extract_next_links(rawDataObj):
     '''
     # print("URL")
     # print(rawDataObj.url)
-    print("CONTENT HII")
-    text = rawDataObj.content
-    print(type(text))
-    # print("ERROR MESSAGE")
-    # print(rawDataObj.error_message)
-    # print("HEADERS")
-    # print(rawDataObj.headers)
-    # print("HTTP CODE")
-    # print(rawDataObj.http_code)
-    # print("IS REDIRECTED")
-    # print(rawDataObj.is_redirected)
-    # print("FINAL URL")
-    # print(rawDataObj.final_url)
+    # print("CONTENT HII4")
+    # text2 = rawDataObj.url
+    # text = rawDataObj.content
+    # print(type(text))
 
-    f1 = open("SiteContent.txt", "w")
-    f1.write(str(text))
-    f1.close()
+    siteURL = rawDataObj.url
 
+    if(len(rawDataObj.content) != 0):
+        ShtmlContent = html.document_fromstring(rawDataObj.content)
+    else:
+        return outputLinks
 
+    #Changes base url if the link is is_redirected
+    if(rawDataObj.is_redirected):
+        siteURL = rawDataObj.final_url
+        #outputLinks.append(siteURL)
+
+    # except:
+    #print("URL")
+    #print(rawDataObj.url)
+
+    #print("\nERROR MSG")
+    #print(rawDataObj.error_message)
+
+    #print("\nHTTP_CODE: " + str(rawDataObj.http_code))
+    # #
+    # #     print("CONTENT")
+    # #     print(rawDataObj.content)
+    # #
+    #
+    htmlContent = html.document_fromstring(rawDataObj.content)
+
+    #Convert all relative paths to absolute using siteURL
+    htmlContent.make_links_absolute(siteURL, resolve_base_href = True)
+
+    #Find all links (returned in a tuple with other information)
+    htmlContentLinks = htmlContent.iterlinks()
+
+    #Iterate through, filter unwanted urls, and add to list
+    for link in htmlContentLinks:
+        #Filter out for elements with href tags and the url does not have spaces
+        if(link[1] == "href" and not " " in link[2]):
+            #print(link[2])
+            outputLinks.append(link[2].encode('utf-8'))
 
 
     return outputLinks
@@ -91,6 +117,7 @@ def is_valid(url):
     This is a great place to filter out crawler traps.
     '''
     parsed = urlparse(url)
+    print("URL: "+ str(url))
     if parsed.scheme not in set(["http", "https"]):
         return False
     try:
