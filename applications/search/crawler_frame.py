@@ -12,6 +12,8 @@ from uuid import uuid4
 
 logger = logging.getLogger(__name__)
 LOG_HEADER = "[CRAWLER]"
+ANALYTICS_STATS = {}
+ANALYTICS_SUBDOMAINS = {}
 
 @Producer(FkfungNssabaLink)
 @GetterSetter(OneFkfungNssabaUnProcessedLink)
@@ -23,11 +25,18 @@ class CrawlerFrame(IApplication):
         self.app_id = "FkfungNssaba"
         self.frame = frame
 
+        ANALYTICS_STATS.clear()
+        ANALYTICS_STATS["Most Outlinks"] = 0
+        ANALYTICS_STATS["Valid URLs"] = 0
+        ANALYTICS_STATS["Invalid URLs"] = 0
+        ANALYTICS_STATS["Total URLs"] = 0
+        ANALYTICS_STATS["Unique URLs"] = 0
+
+        ANALYTICS_SUBDOMAINS.clear()
 
     def initialize(self):
         self.count = 0
         l = FkfungNssabaLink("http://www.ics.uci.edu/")
-        #l = FkfungNssabaLink("http://www.ics.uci.edu/ugrad/polices/academic_standing")
         print l.full_url
         self.frame.add(l)
 
@@ -43,6 +52,19 @@ class CrawlerFrame(IApplication):
                     self.frame.add(FkfungNssabaLink(l))
 
     def shutdown(self):
+        #if not os.path.exists("applications\search\Analytics1.txt"):
+        #    os.makedirs("Analytics1.txt")
+        #print(os.getcwd())
+        testFile = open("Analytics1.txt", "w")
+
+        for k,v in ANALYTICS_STATS.iteritems():
+            testFile.write(str(k) + ": " + str(v) + "\n")
+
+        for k,v in ANALYTICS_SUBDOMAINS.iteritems():
+            testFile.write(str(k) + " : " + str(v) + "\n")
+
+        testFile.close()
+
         print (
             "Time time spent this session: ",
             time() - self.starttime, " seconds.")
@@ -61,10 +83,9 @@ def extract_next_links(rawDataObj):
     '''
     # print("URL")
     # print(rawDataObj.url)
-    # print("CONTENT HII4")
     # text2 = rawDataObj.url
     # text = rawDataObj.content
-    # print(type(text))
+    #print(rawDataObj.error_message)
 
     siteURL = rawDataObj.url
 
@@ -76,21 +97,8 @@ def extract_next_links(rawDataObj):
     #Changes base url if the link is is_redirected
     if(rawDataObj.is_redirected):
         siteURL = rawDataObj.final_url
-        #outputLinks.append(siteURL)
+        outputLinks.append(siteURL)
 
-    # except:
-    #print("URL")
-    #print(rawDataObj.url)
-
-    #print("\nERROR MSG")
-    #print(rawDataObj.error_message)
-
-    #print("\nHTTP_CODE: " + str(rawDataObj.http_code))
-    # #
-    # #     print("CONTENT")
-    # #     print(rawDataObj.content)
-    # #
-    #
     htmlContent = html.document_fromstring(rawDataObj.content)
 
     #Convert all relative paths to absolute using siteURL
@@ -100,12 +108,18 @@ def extract_next_links(rawDataObj):
     htmlContentLinks = htmlContent.iterlinks()
 
     #Iterate through, filter unwanted urls, and add to list
+    urlCount = 0
+
     for link in htmlContentLinks:
         #Filter out for elements with href tags and the url does not have spaces
         if(link[1] == "href" and not " " in link[2]):
             #print(link[2])
+            urlCount += 1
             outputLinks.append(link[2].encode('utf-8'))
 
+    #See if it has the most outputLinks
+    if (ANALYTICS_STATS["Most Outlinks"] < urlCount):
+       ANALYTICS_STATS["Most Outlinks"] =  urlCount
 
     return outputLinks
 
@@ -117,17 +131,44 @@ def is_valid(url):
     This is a great place to filter out crawler traps.
     '''
     parsed = urlparse(url)
-    print("URL: "+ str(url))
+
+    #Increments total URLs
+    ANALYTICS_STATS["Total URLs"] += 1
+
+    # if url in ANALYTICS_SUBDOMAINS.keys():
+    #     ANALYTICS_SUBDOMAINS[url] += 1
+    # else:
+    #     ANALYTICS_SUBDOMAINS[url] = 1
+
+
+    if url in ANALYTICS_SUBDOMAINS.keys():
+        ANALYTICS_SUBDOMAINS[parsed.netloc] += 1
+    else:
+        ANALYTICS_SUBDOMAINS[parsed.netloc] = 1
+        ANALYTICS_STATS["Unique URLs"] += 1
+
+    #print("URL: "+ str(url))
     if parsed.scheme not in set(["http", "https"]):
+        ANALYTICS_STATS["Invalid URLs"] += 1
         return False
     try:
-        return ".ics.uci.edu" in parsed.hostname \
+        #Check for crawler traps
+        if (len(url) > 150) or ("?" in url) or ("#" in url) or (parsed.netloc == ""):
+            ANALYTICS_STATS["Invalid URLs"] += 1
+            return False
+
+        if ".ics.uci.edu" in parsed.hostname \
             and not re.match(".*\.(css|js|bmp|gif|jpe?g|ico" + "|png|tiff?|mid|mp2|mp3|mp4"\
             + "|wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pdf" \
             + "|ps|eps|tex|ppt|pptx|doc|docx|xls|xlsx|names|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso|epub|dll|cnf|tgz|sha1" \
             + "|thmx|mso|arff|rtf|jar|csv"\
-            + "|rm|smil|wmv|swf|wma|zip|rar|gz)$", parsed.path.lower())
+            + "|rm|smil|wmv|swf|wma|zip|rar|gz)$", parsed.path.lower()):
+            ANALYTICS_STATS["Valid URLs"] += 1
+        else:
+            ANALYTICS_STATS["Invalid URLs"] += 1
+            return False
 
     except TypeError:
         print ("TypeError for ", parsed)
+        ANALYTICS_STATS["Invalid URLs"] += 1
         return False
